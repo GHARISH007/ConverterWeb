@@ -2,6 +2,7 @@
 class FileConverterApp {
     constructor() {
         this.files = [];
+        this.dimensionUpdateTimeout = null;
         this.initElements();
         this.bindEvents();
         this.setupDragAndDrop();
@@ -41,7 +42,7 @@ class FileConverterApp {
         this.maintainRatio.addEventListener('change', (e) => this.toggleAspectRatio(e.target.checked));
         this.resetBtn.addEventListener('click', () => this.resetForm());
         this.convertBtn.addEventListener('click', () => this.startConversion());
-        
+
         // Real-time dimension updates
         this.imgWidth.addEventListener('input', (e) => this.updateDimensions('width', e.target.value));
         this.imgHeight.addEventListener('input', (e) => this.updateDimensions('height', e.target.value));
@@ -79,46 +80,64 @@ class FileConverterApp {
         this.files = Array.from(selectedFiles);
         this.displayFilePreviews();
         this.populateConversionOptions();
-        this.autoSelectConversionType();
         this.showFilePreview();
     }
 
     displayFilePreviews() {
         this.previewGrid.innerHTML = '';
-        
+
+        // Process files with a small delay between each to prevent resource overload
         this.files.forEach((file, index) => {
-            const previewItem = document.createElement('div');
-            previewItem.className = 'preview-item';
-            
-            const fileName = file.name;
-            const fileType = this.getFileTypeFromFile(file);
-            
-            if (fileType === 'image') {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    previewItem.innerHTML = `
-                        <img src="${e.target.result}" alt="${fileName}">
-                        <div class="file-info">${fileName}</div>
-                        <small class="file-size">${this.formatFileSize(file.size)}</small>
-                        <button class="remove-btn" onclick="app.removeFile(${index})">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    `;
-                };
-                reader.readAsDataURL(file);
-            } else {
+            setTimeout(() => {
+                this.createPreviewItem(file, index);
+            }, index * 50); // 50ms delay between each file
+        });
+    }
+
+    createPreviewItem(file, index) {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+
+        const fileName = file.name;
+        const fileType = this.getFileTypeFromFile(file);
+
+        if (fileType === 'image') {
+            const reader = new FileReader();
+            reader.onload = (e) => {
                 previewItem.innerHTML = `
-                    <i class="fas fa-file ${this.getFileIconClass(file.type)}"></i>
+                    <img src="${e.target.result}" alt="${fileName}">
                     <div class="file-info">${fileName}</div>
                     <small class="file-size">${this.formatFileSize(file.size)}</small>
                     <button class="remove-btn" onclick="app.removeFile(${index})">
                         <i class="fas fa-times"></i>
                     </button>
                 `;
-            }
-            
-            this.previewGrid.appendChild(previewItem);
-        });
+            };
+            reader.onerror = () => {
+                // Handle read error
+                previewItem.innerHTML = `
+                    <i class="fas fa-file-image"></i>
+                    <div class="file-info">${fileName}</div>
+                    <small class="file-size">${this.formatFileSize(file.size)}</small>
+                    <div class="error">Preview failed</div>
+                    <button class="remove-btn" onclick="app.removeFile(${index})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewItem.innerHTML = `
+                <i class="fas fa-file ${this.getFileIconClass(file.type)}"></i>
+                <div class="file-info">${fileName}</div>
+                <small class="file-size">${this.formatFileSize(file.size)}</small>
+                <button class="remove-btn" onclick="app.removeFile(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+        }
+
+        this.previewGrid.appendChild(previewItem);
     }
 
     formatFileSize(bytes) {
@@ -170,28 +189,52 @@ class FileConverterApp {
 
     updateDimensions(type, value) {
         if (this.maintainRatio.checked && this.files.length > 0 && this.files[0].type.startsWith('image/')) {
-            const img = new Image();
-            img.onload = () => {
-                const originalWidth = img.width;
-                const originalHeight = img.height;
-                
-                if (type === 'width' && value) {
-                    const ratio = originalHeight / originalWidth;
-                    this.imgHeight.value = Math.round(value * ratio);
-                } else if (type === 'height' && value) {
-                    const ratio = originalWidth / originalHeight;
-                    this.imgWidth.value = Math.round(value * ratio);
-                }
-            };
-            img.src = URL.createObjectURL(this.files[0]);
+            // Add a small delay to prevent rapid successive calls
+            if (this.dimensionUpdateTimeout) {
+                clearTimeout(this.dimensionUpdateTimeout);
+            }
+
+            this.dimensionUpdateTimeout = setTimeout(() => {
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(this.files[0]);
+
+                img.onload = () => {
+                    const originalWidth = img.width;
+                    const originalHeight = img.height;
+
+                    // Clean up the object URL immediately after loading
+                    URL.revokeObjectURL(objectUrl);
+
+                    if (type === 'width' && value) {
+                        const ratio = originalHeight / originalWidth;
+                        this.imgHeight.value = Math.round(value * ratio);
+                    } else if (type === 'height' && value) {
+                        const ratio = originalWidth / originalHeight;
+                        this.imgWidth.value = Math.round(value * ratio);
+                    }
+                };
+
+                // Set error handler to clean up on failure
+                img.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                };
+
+                img.src = objectUrl;
+            }, 300); // 300ms debounce delay
         }
     }
 
     removeFile(index) {
+        // Clear any pending dimension updates
+        if (this.dimensionUpdateTimeout) {
+            clearTimeout(this.dimensionUpdateTimeout);
+            this.dimensionUpdateTimeout = null;
+        }
+
         this.files.splice(index, 1);
         this.displayFilePreviews();
         this.populateConversionOptions();
-        
+
         if (this.files.length === 0) {
             this.filePreview.style.display = 'none';
             this.uploadArea.style.display = 'block';
@@ -201,187 +244,57 @@ class FileConverterApp {
 
     populateConversionOptions() {
         const conversionTypeSelect = this.convertType;
-        
-        // Completely clear the dropdown - remove ALL existing options
-        conversionTypeSelect.innerHTML = '';
-        
-        // Add the default placeholder option
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = '-- Select Conversion Type --';
-        conversionTypeSelect.appendChild(defaultOption);
+        conversionTypeSelect.innerHTML = '<option value="">-- Select Conversion Type --</option>';
 
-        if (this.files.length === 0) {
-            return;
-        }
+        if (this.files.length === 0) return;
 
-        // Get the file type of the first uploaded file
-        const firstFile = this.files[0];
-        const fileType = this.getFileTypeFromFile(firstFile);
-        
-        console.log(`File uploaded: ${firstFile.name}, Detected type: ${fileType}, Extension: ${firstFile.name.split('.').pop()?.toLowerCase()}`);
+        // Determine file types (use MIME type when available, fall back to extension)
+        const fileTypes = this.files.map(file => this.getFileTypeFromFile(file));
+        const uniqueFileTypes = [...new Set(fileTypes)];
 
-        // Get conversion options ONLY for the detected file type
-        const options = this.getConversionOptionsForType(fileType);
-        
-        console.log(`Available conversion options for ${fileType}:`, options.map(o => o.text));
-
-        // Add only the relevant options to the dropdown
-        if (options.length > 0) {
+        // Populate conversion options based on file types
+        uniqueFileTypes.forEach(fileType => {
+            const options = this.getConversionOptionsForType(fileType);
             options.forEach(option => {
-                // Safety check: For Excel files, ensure we never add Word options
-                if (fileType === 'excel' && option.value === 'word-to-pdf') {
-                    console.error('ERROR: Attempted to add Word option for Excel file! This should never happen.');
-                    return; // Skip this option
-                }
-                
-                // Safety check: For Word files, ensure we never add Excel options
-                if (fileType === 'word' && option.value === 'excel-to-pdf') {
-                    console.error('ERROR: Attempted to add Excel option for Word file! This should never happen.');
-                    return; // Skip this option
-                }
-                
                 const optionElement = document.createElement('option');
                 optionElement.value = option.value;
                 optionElement.textContent = option.text;
                 conversionTypeSelect.appendChild(optionElement);
             });
-        } else {
-            console.warn(`No conversion options available for file type: ${fileType}`);
-        }
-        
-        // Final verification: Ensure dropdown only contains expected options
-        const allOptions = Array.from(conversionTypeSelect.options).map(opt => ({ value: opt.value, text: opt.text }));
-        console.log('Final dropdown options:', allOptions);
-        
-        // Additional validation for Excel files
-        if (fileType === 'excel') {
-            const hasWordOption = Array.from(conversionTypeSelect.options).some(opt => opt.value === 'word-to-pdf');
-            if (hasWordOption) {
-                console.error('CRITICAL ERROR: Word to PDF option found in dropdown for Excel file! Removing it.');
-                const wordOption = conversionTypeSelect.querySelector('option[value="word-to-pdf"]');
-                if (wordOption) {
-                    wordOption.remove();
-                }
-            }
-            
-            const hasExcelOption = Array.from(conversionTypeSelect.options).some(opt => opt.value === 'excel-to-pdf');
-            if (!hasExcelOption) {
-                console.error('CRITICAL ERROR: Excel to PDF option missing for Excel file! Adding it.');
-                const excelOption = document.createElement('option');
-                excelOption.value = 'excel-to-pdf';
-                excelOption.textContent = 'Excel to PDF';
-                conversionTypeSelect.appendChild(excelOption);
-            }
-        }
-    }
-    
-    autoSelectConversionType() {
-        if (this.files.length === 0) return;
-        
-        // Get the type of the first file
-        const firstFileType = this.getFileTypeFromFile(this.files[0]);
-        console.log(`Auto-selecting conversion type for file type: ${firstFileType}`);
-        
-        // Define mapping of file types to their default conversion targets
-        const defaultConversionMap = {
-            'image': 'img-to-pdf',
-            'pdf': 'pdf-to-word',
-            'word': 'word-to-pdf',
-            'excel': 'excel-to-pdf'
-        };
-        
-        // Get the default conversion type for the file type
-        const defaultConversion = defaultConversionMap[firstFileType];
-        console.log(`Default conversion: ${defaultConversion}`);
-        
-        if (defaultConversion) {
-            // Check if the option exists in the dropdown before setting it
-            const optionExists = this.convertType.querySelector(`option[value="${defaultConversion}"]`);
-            console.log(`Option exists: ${!!optionExists}, Current dropdown value: ${this.convertType.value}`);
-            
-            if (optionExists) {
-                this.convertType.value = defaultConversion;
-                console.log(`Set dropdown to: ${defaultConversion}`);
-                // Trigger the change event to show/hide relevant settings
-                this.handleConvertTypeChange(defaultConversion);
-            } else {
-                console.warn(`Option ${defaultConversion} not found in dropdown!`);
-            }
-        }
+        });
     }
 
     getFileType(mimeType) {
         if (mimeType.startsWith('image/')) return 'image';
         if (mimeType.includes('pdf')) return 'pdf';
-        if (mimeType.includes('msword') || mimeType.includes('vnd.openxmlformats-officedocument.wordprocessingml')) return 'word';
-        if (mimeType.includes('vnd.ms-excel') || mimeType.includes('vnd.openxmlformats-officedocument.spreadsheetml')) return 'excel';
+        if (mimeType.includes('word') || mimeType.includes('document')) return 'word';
+        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'excel';
         return 'unknown';
     }
 
     getFileTypeFromFile(file) {
-        // First, check file extension (most reliable method)
-        const fileName = file.name.toLowerCase().trim();
-        
-        // Get extension more reliably
-        let extension = '';
-        const lastDotIndex = fileName.lastIndexOf('.');
-        if (lastDotIndex > 0 && lastDotIndex < fileName.length - 1) {
-            extension = fileName.substring(lastDotIndex + 1);
-        }
-        
-        // Excel files - check FIRST to ensure they're not misidentified
-        if (extension === 'xls' || extension === 'xlsx') {
-            console.log(`Excel file detected by extension: ${file.name}, extension: ${extension}`);
-            return 'excel';
-        }
-
-        // Word files
-        if (extension === 'doc' || extension === 'docx') {
-            return 'word';
-        }
-
-        // PDF files
-        if (extension === 'pdf') {
-            return 'pdf';
-        }
-
-        // Images
-        if (['jpg', 'jpeg', 'jfif', 'jif', 'png', 'gif', 'bmp', 'webp', 'ico', 'avif'].includes(extension)) {
-            return 'image';
-        }
-
-        // Fallback to MIME type if extension check didn't match
+        // Prefer MIME type when available
         if (file.type) {
-            const mimeType = file.type.toLowerCase();
-            console.log(`Extension check failed, checking MIME type: ${mimeType} for file: ${file.name}`);
-            
-            if (mimeType.startsWith('image/')) return 'image';
-            if (mimeType.includes('pdf')) return 'pdf';
-            
-            // Check Excel before Word to avoid misclassification
-            if (mimeType.includes('vnd.ms-excel') || 
-                mimeType.includes('vnd.openxmlformats-officedocument.spreadsheetml') || 
-                mimeType.includes('spreadsheet') ||
-                mimeType.includes('excel')) {
-                console.log(`Excel file detected by MIME type: ${mimeType}`);
-                return 'excel';
-            }
-            
-            // Word files - be specific to avoid matching Excel files
-            if (mimeType.includes('msword') || 
-                mimeType.includes('vnd.openxmlformats-officedocument.wordprocessingml')) {
-                return 'word';
-            }
+            const mime = file.type.toLowerCase();
+            if (mime.startsWith('image/')) return 'image';
+            if (mime.includes('pdf')) return 'pdf';
+            if (mime.includes('word') || mime.includes('document')) return 'word';
+            if (mime.includes('excel') || mime.includes('spreadsheet')) return 'excel';
         }
 
-        console.warn(`Unknown file type for: ${file.name}, extension: ${extension}, MIME: ${file.type || 'none'}`);
+        // Fallback to file extension if MIME type is empty (some OS file pickers omit it)
+        const name = file.name.toLowerCase();
+        if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.jfif') || name.endsWith('.jif') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.bmp') || name.endsWith('.webp') || name.endsWith('.ico')) return 'image';
+        if (name.endsWith('.pdf')) return 'pdf';
+        if (name.endsWith('.doc') || name.endsWith('.docx')) return 'word';
+        if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'excel';
+
         return 'unknown';
     }
 
     getConversionOptionsForType(fileType) {
         const options = [];
-        
+
         switch (fileType) {
             case 'image':
                 options.push(
@@ -400,27 +313,34 @@ class FileConverterApp {
                 );
                 break;
             case 'word':
-                // Only Word files get Word to PDF option
                 options.push(
                     { value: 'word-to-pdf', text: 'Word to PDF' }
                 );
                 break;
             case 'excel':
-                // Only Excel files get Excel to PDF option - NO Word options
                 options.push(
                     { value: 'excel-to-pdf', text: 'Excel to PDF' }
                 );
                 break;
-            default:
-                console.warn(`Unknown file type: ${fileType}, no conversion options available`);
-                break;
         }
-        
+
         return options;
     }
 
-    resetForm() {
+    cleanup() {
+        // Clear any pending timeouts
+        if (this.dimensionUpdateTimeout) {
+            clearTimeout(this.dimensionUpdateTimeout);
+            this.dimensionUpdateTimeout = null;
+        }
+
+        // Clear file references
         this.files = [];
+    }
+
+    resetForm() {
+        this.cleanup();
+
         this.fileInput.value = '';
         this.previewGrid.innerHTML = '';
         this.convertType.innerHTML = '<option value="">-- Select Conversion Type --</option>';
@@ -452,7 +372,7 @@ class FileConverterApp {
         // Disable buttons during conversion
         this.convertBtn.disabled = true;
         this.convertBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Converting...';
-        
+
         this.showProgress(true);
 
         try {
@@ -478,7 +398,7 @@ class FileConverterApp {
         formData.append('conversionType', this.convertType.value);
         formData.append('quality', this.qualitySlider.value);
         formData.append('oneClickCompression', this.oneClickCompression.checked);
-        
+
         if (this.imgWidth.value) formData.append('width', this.imgWidth.value);
         if (this.imgHeight.value) formData.append('height', this.imgHeight.value);
         formData.append('dpi', this.imgDpi.value);
@@ -487,7 +407,7 @@ class FileConverterApp {
         try {
             this.updateProgress(10); // Initial progress
             this.progressText.textContent = 'Preparing file...';
-            
+
             const response = await this.uploadWithProgress(
                 formData,
                 '/api/FileConversion/convert',
@@ -499,18 +419,18 @@ class FileConverterApp {
 
             this.updateProgress(95);
             this.progressText.textContent = 'Finalizing...';
-            
+
             // Prefer server-provided filename header
             const serverFileName = response.name || response.fileName || null;
             const downloadName = serverFileName || 'converted_file';
-            
+
             // Get original file size for comparison
             const originalFileSize = this.files[0].size;
             const compressedFileSize = (response.blob || response).size;
-            
+
             // Show size comparison before download
             const sizeComparison = this.getSizeComparisonString(originalFileSize, compressedFileSize);
-            
+
             // Check if compressed file is larger than original
             if (compressedFileSize > originalFileSize && this.convertType.value === 'compress-img') {
                 this.updateProgress(100);
@@ -518,7 +438,7 @@ class FileConverterApp {
                 this.showToast(`Compression resulted in larger file (${sizeComparison}). No download performed.`, 'warning');
                 return; // Skip download if compressed file is larger
             }
-            
+
             this.downloadBlob(response.blob || response, downloadName);
             this.updateProgress(100);
             this.progressText.textContent = 'Completed!';
@@ -531,15 +451,15 @@ class FileConverterApp {
 
     async convertBatchFiles() {
         const formData = new FormData();
-        
+
         this.files.forEach(file => {
             formData.append('files', file);
         });
-        
+
         formData.append('conversionType', this.convertType.value);
         formData.append('quality', this.qualitySlider.value);
         formData.append('oneClickCompression', this.oneClickCompression.checked);
-        
+
         if (this.imgWidth.value) formData.append('width', this.imgWidth.value);
         if (this.imgHeight.value) formData.append('height', this.imgHeight.value);
         formData.append('dpi', this.imgDpi.value);
@@ -548,7 +468,7 @@ class FileConverterApp {
         try {
             this.updateProgress(5); // Initial progress
             this.progressText.textContent = `Preparing ${this.files.length} files...`;
-            
+
             const response = await this.uploadWithProgress(
                 formData,
                 '/api/FileConversion/batch-convert',
@@ -560,14 +480,18 @@ class FileConverterApp {
 
             this.updateProgress(95);
             this.progressText.textContent = 'Creating archive...';
-            
-            // For batch compression, check if any files got larger
-            if (this.convertType.value === 'compress-img') {
-                // Note: For batch operations, we can't easily determine individual file sizes
-                // So we'll just proceed with the zip download
+
+            // Response can be either a Blob or an object { blob, fileName }
+            const resBlob = (response && response.blob) ? response.blob : response;
+            const fileName = (response && response.fileName) ? response.fileName : 'converted_files.zip';
+
+            // Validate blob before trying to createObjectURL
+            if (!resBlob || typeof resBlob.size !== 'number' || resBlob.size === 0) {
+                this.showToast('Server returned an empty file. Conversion failed.', 'error');
+                throw new Error('Empty or invalid response from server');
             }
-            
-            this.downloadBlob(response, 'converted_files.zip');
+
+            this.downloadBlob(resBlob, fileName);
             this.updateProgress(100);
             this.progressText.textContent = 'Completed!';
             this.showToast(`${this.files.length} files converted successfully!`, 'success');
@@ -596,17 +520,40 @@ class FileConverterApp {
     async uploadWithProgress(formData, endpoint, onProgress) {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-            
+
             xhr.upload.addEventListener('progress', (event) => {
                 if (event.lengthComputable) {
                     const percentComplete = (event.loaded / event.total) * 100;
                     onProgress(Math.round(percentComplete));
                 }
             });
-            
+
             xhr.addEventListener('load', async () => {
+                const resBlob = xhr.response;
+                const contentType = (xhr.getResponseHeader('content-type') || '').toLowerCase();
+
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    const resBlob = xhr.response;
+                    // Empty response
+                    if (!resBlob || typeof resBlob.size !== 'number' || resBlob.size === 0) {
+                        reject(new Error('Empty response received from server'));
+                        return;
+                    }
+
+                    // If server returned JSON (error payload) in a blob, parse and reject
+                    if (contentType.includes('application/json') || contentType.includes('text/')) {
+                        try {
+                            const text = await resBlob.text();
+                            const json = JSON.parse(text);
+                            const msg = json && (json.message || json.Message || json.error || json.errors) ? (json.message || json.Message || json.error || json.errors) : text;
+                            reject(new Error(msg || 'Server returned an error'));
+                            return;
+                        } catch (e) {
+                            reject(new Error('Unexpected server response'));
+                            return;
+                        }
+                    }
+
+                    // Successful binary response (PDF / ZIP / image)
                     const cdHeader = xhr.getResponseHeader('content-disposition') || xhr.getResponseHeader('x-filename');
                     if (cdHeader) {
                         let name = null;
@@ -615,32 +562,21 @@ class FileConverterApp {
                         const starMatch = cdHeader.match(/filename\*\s*=\s*(?:UTF-8'')?([^;\n\r]+)/i);
                         if (starMatch && starMatch[1]) {
                             const encoded = starMatch[1].trim().replace(/^"|"$/g, '');
-                            try {
-                                name = decodeURIComponent(encoded);
-                            } catch (e) {
-                                name = encoded;
-                            }
+                            try { name = decodeURIComponent(encoded); } catch (e) { name = encoded; }
                         }
 
-                        // Fallback to regular filename token
                         if (!name) {
                             const fnMatch = cdHeader.match(/filename\s*=\s*"?([^";]+)"?/i);
-                            if (fnMatch && fnMatch[1]) {
-                                name = fnMatch[1].trim();
-                            }
+                            if (fnMatch && fnMatch[1]) name = fnMatch[1].trim();
                         }
 
-                        if (name) {
-                            resolve({ blob: resBlob, fileName: name });
-                            return;
-                        }
+                        if (name) { resolve({ blob: resBlob, fileName: name }); return; }
                     }
 
                     resolve(resBlob);
                 } else {
+                    // Non-success status: try to read JSON error body and surface message
                     try {
-                        // Server likely returned a JSON error body; read blob and parse
-                        const resBlob = xhr.response;
                         if (resBlob && typeof resBlob.text === 'function') {
                             const text = await resBlob.text();
                             try {
@@ -649,7 +585,7 @@ class FileConverterApp {
                                 reject(new Error(msg || `HTTP ${xhr.status}: ${xhr.statusText}`));
                                 return;
                             } catch (e) {
-                                // Not JSON, fall through
+                                // Not JSON
                             }
                         }
                     } catch (ex) {
@@ -659,11 +595,11 @@ class FileConverterApp {
                     reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
                 }
             });
-            
+
             xhr.addEventListener('error', () => {
                 reject(new Error('Network error occurred'));
             });
-            
+
             xhr.open('POST', endpoint);
             xhr.responseType = 'blob';
             xhr.send(formData);
@@ -681,11 +617,11 @@ class FileConverterApp {
         this.files.forEach((file, index) => {
             const resultItem = document.createElement('div');
             resultItem.className = 'result-item';
-            
+
             const originalName = file.name;
             const extension = this.getOutputExtension();
             const newName = originalName.substring(0, originalName.lastIndexOf('.')) + extension;
-            
+
             resultItem.innerHTML = `
                 <i class="fas fa-file-${this.getResultIcon()}"></i>
                 <div>${newName}</div>
@@ -693,7 +629,7 @@ class FileConverterApp {
                     <i class="fas fa-download"></i> Download
                 </button>
             `;
-            
+
             this.resultFiles.appendChild(resultItem);
         });
     }
@@ -733,7 +669,7 @@ class FileConverterApp {
         const originalSizeStr = this.formatFileSize(originalSize);
         const newSizeStr = this.formatFileSize(newSize);
         const percentage = ((newSize - originalSize) / originalSize * 100).toFixed(1);
-        
+
         if (percentage > 0) {
             return `(Size increased: ${originalSizeStr} → ${newSizeStr} [${percentage}%])`;
         } else if (percentage < 0) {
@@ -752,15 +688,15 @@ class FileConverterApp {
     showToast(message, type = 'info') {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
-        
+
         const icon = this.getToastIcon(type);
         toast.innerHTML = `
             <i class="fas ${icon}"></i>
             <span>${message}</span>
         `;
-        
+
         this.toastContainer.appendChild(toast);
-        
+
         setTimeout(() => {
             toast.remove();
         }, 3000);
