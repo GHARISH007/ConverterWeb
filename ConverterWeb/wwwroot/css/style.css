@@ -105,7 +105,17 @@ body {
 .main {
     padding: 2rem 0;
 }
-
+.rocket-icon {
+    font-size: 1.2em;
+    background: linear-gradient( 180deg, #ff3d00 0%, /* flame red */
+    #ff9100 40%, /* orange */
+    #ffd600 70%, /* yellow */
+    #ffffff 100% /* white tip */
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 6px rgba(255, 87, 34, 0.6), 0 0 12px rgba(255, 152, 0, 0.4);
+}
 /* Hero Section */
 .hero {
     text-align: center;
@@ -131,7 +141,10 @@ body {
     color: rgba(255, 255, 255, 0.9);
     margin-bottom: 2rem;
 }
-
+.rocket-icon:hover {
+    transform: translateY(-2px) rotate(-10deg);
+    transition: 0.3s ease;
+}
 .btn {
     padding: 12px 30px;
     border: none;
