@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern File Converter | Premium File Conversion Tool</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header" role="banner">
+        <div class="container">
+            <h1 class="logo" aria-label="File Converter Application">
+                <i class="fas fa-file-contract" aria-hidden="true"></i> 
+                File<span>Converter</span>
+            </h1>
+            <nav class="nav" role="navigation" aria-label="Main Navigation">
+                <ul>
+                    <li><a href="#" class="active" aria-current="page">Home</a></li>
+                    <li><a href="#">Features</a></li>
+                    <li><a href="#">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="hero-content">
+                    <h2>Convert Files Like a Pro</h2>
+                    <p>Transform your documents, images, and files with our premium conversion tools. Fast, secure, and easy to use.</p>
+                    <button class="btn btn-gradient btn-large">Get Started</button>
+                </div>
+            </section>
+
+            <!-- Conversion Steps -->
+            <section class="conversion-steps">
+                <div class="step-card">
+                    <div class="step-icon">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                    <h3>Upload</h3>
+                    <p>Drag & drop or browse your files</p>
+                </div>
+                <div class="step-arrow">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">
+                        <i class="fas fa-cog"></i>
+                    </div>
+                    <h3>Configure</h3>
+                    <p>Adjust settings and options</p>
+                </div>
+                <div class="step-arrow">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">
+                        <i class="fas fa-sync-alt"></i>
+                    </div>
+                    <h3>Convert</h3>
+                    <p>Process your files instantly</p>
+                </div>
+                <div class="step-arrow">
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+                <div class="step-card">
+                    <div class="step-icon">
+                        <i class="fas fa-download"></i>
+                    </div>
+                    <h3>Download</h3>
+                    <p>Get your converted files</p>
+                </div>
+            </section>
+
+            <!-- Converter Section -->
+            <section class="converter-section">
+                <div class="converter-container">
+                    <!-- Upload Area -->
+                    <div class="upload-area" id="uploadArea" role="region" aria-label="File Upload Area">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt" aria-hidden="true"></i>
+                            <h3>Drag & Drop Your Files Here</h3>
+                            <p>or</p>
+                            <button class="btn btn-outline" id="browseBtn" aria-describedby="fileHelp">
+                                <i class="fas fa-folder-open" aria-hidden="true"></i> Browse Files
+                            </button>
+                            <input type="file" id="fileInput" multiple accept="image/*,.jpg,.jpeg,.png,.gif,.bmp,.ico,.webp,application/pdf,.pdf,application/msword,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/vnd.ms-excel,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx" class="sr-only" aria-describedby="fileHelp">
+                            <div id="fileHelp" class="sr-only">Select files to upload for conversion</div>
+                        </div>
+                    </div>
+
+                    <!-- File Preview -->
+                    <div class="file-preview" id="filePreview" style="display: none;">
+                        <h3>Selected Files</h3>
+                        <div class="preview-grid" id="previewGrid"></div>
+                        
+                        <!-- Conversion Options -->
+                        <div class="conversion-options">
+                            <h3 id="conversionOptionsTitle">Conversion Options</h3>
+                            
+                            <!-- Conversion Type Selector -->
+                            <div class="option-group">
+                                <label for="convertType">Convert To:</label>
+                                <select id="convertType" class="form-select" aria-labelledby="conversionOptionsTitle">
+                                    <option value="">-- Select Conversion Type --</option>
+                                    <option value="img-to-pdf">Image to PDF</option>
+                                    <option value="pdf-to-word">PDF to Word</option>
+                                    <option value="excel-to-pdf">Excel to PDF</option>
+                                    <option value="word-to-pdf">Word to PDF</option>
+                                    <option value="img-to-jpeg">Image to JPEG</option>
+                                    <option value="img-to-png">Image to PNG</option>
+                                    <option value="img-to-webp">Image to WEBP</option>
+                                    <option value="img-to-ico">Image to ICO</option>
+                                    <option value="compress-img">Compress Image</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Image Settings -->
+                            <div class="option-group" id="imageSettings" style="display: none;">
+                                <label>Image Quality:</label>
+                                <input type="range" id="qualitySlider" min="1" max="100" value="80">
+                                <span id="qualityValue">80%</span>
+                                
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="oneClickCompression">
+                                    <label for="oneClickCompression">One-click 50% compression</label>
+                                </div>
+                                
+                                <div class="dimension-group">
+                                    <div class="dimension-input">
+                                        <label>Width:</label>
+                                        <input type="number" id="imgWidth" placeholder="Auto">
+                                    </div>
+                                    <div class="dimension-input">
+                                        <label>Height:</label>
+                                        <input type="number" id="imgHeight" placeholder="Auto">
+                                    </div>
+                                    <div class="checkbox-group">
+                                        <input type="checkbox" id="maintainRatio" checked>
+                                        <label for="maintainRatio">Maintain Aspect Ratio</label>
+                                    </div>
+                                </div>
+                                
+                                <div class="dimension-group">
+                                    <div class="dimension-input">
+                                        <label>DPI:</label>
+                                        <input type="number" id="imgDpi" value="300" min="72" max="1200">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" id="resetBtn">
+                                <i class="fas fa-times"></i> Reset
+                            </button>
+                            <button class="btn btn-gradient" id="convertBtn">
+                                <i class="fas fa-sync-alt"></i> Convert Now
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-container" id="progressContainer" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="progressText">Processing... 0%</p>
+                    </div>
+                    
+                    <!-- Results -->
+                    <div class="results-container" id="resultsContainer" style="display: none;">
+                        <h3>Conversion Results</h3>
+                        <div class="result-files" id="resultFiles"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 FileConverter. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
