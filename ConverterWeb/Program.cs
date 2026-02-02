@@ -6,7 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Register code page provider for libraries (iTextSharp) that require code page encodings
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-// Add services to the container.
+// Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddScoped<IFileConversionService, FileConversionService>();
 builder.Services.AddCors(options =>
@@ -19,13 +19,13 @@ builder.Services.AddCors(options =>
 				   .AllowAnyHeader();
 		});
 });
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
 	app.UseSwagger();
@@ -40,10 +40,16 @@ app.UseCors("AllowAll");
 
 app.UseAuthorization();
 
+// ✅ Default root endpoint so "/" URL works
+app.MapGet("/", () => "🚀 Turbo File Converter API is running!");
+
+// Map all your controllers
 app.MapControllers();
 
-// ✅ Cloud Run fix: use the PORT environment variable
+// ✅ Listen on the Cloud Run PORT environment variable
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://*:{port}");
+
+Console.WriteLine($"Server started on port {port}"); // optional logging for debugging
 
 app.Run();
